@@ -32,7 +32,7 @@ use gstreamer_base::{
 use once_cell::sync::Lazy;
 use webrtc_vad::{Vad, VadMode};
 use whisper_rs::{
-  convert_integer_to_float_audio, FullParams, SamplingStrategy, WhisperContext, WhisperState,
+  convert_integer_to_float_audio, FullParams, SamplingStrategy, WhisperContext, WhisperState, WhisperContextParameters,
 };
 
 const SAMPLE_RATE: usize = 16_000;
@@ -45,7 +45,7 @@ const DEFAULT_CONTEXT: bool = true;
 
 static WHISPER_CONTEXT: Lazy<WhisperContext> = Lazy::new(|| {
   let path = env::var("WHISPER_MODEL_PATH").unwrap();
-  WhisperContext::new(&path).unwrap()
+  WhisperContext::new_with_params(&path, WhisperContextParameters::default()).unwrap()
 });
 
 static CAT: Lazy<DebugCategory> = Lazy::new(|| {
@@ -119,7 +119,12 @@ impl WhisperFilter {
   }
 
   fn run_model(&self, state: &mut State, chunk: Chunk) -> Result<Option<Buffer>, FlowError> {
-    let samples = convert_integer_to_float_audio(&chunk.buffer);
+    let mut samples = vec![0.0f32; chunk.buffer.len()];
+
+    if let Err(err) = convert_integer_to_float_audio(&chunk.buffer, &mut samples) {
+      gstreamer::debug!(CAT, "err {:?}", err);
+      return Ok(None);
+    }
 
     let start = Instant::now();
     state
