@@ -42,6 +42,7 @@ const DEFAULT_MIN_VOICE_ACTIVITY_MS: u64 = 200;
 const DEFAULT_LANGUAGE: &str = "en";
 const DEFAULT_TRANSLATE: bool = false;
 const DEFAULT_CONTEXT: bool = true;
+const DEFAULT_NUM_THREAD: i32 = 1;
 
 static WHISPER_CONTEXT: Lazy<WhisperContext> = Lazy::new(|| {
   let path = env::var("WHISPER_MODEL_PATH").unwrap();
@@ -74,6 +75,7 @@ struct Settings {
   language: String,
   translate: bool,
   context: bool,
+  num_thread: i32,
 }
 
 struct State {
@@ -114,6 +116,7 @@ impl WhisperFilter {
       }
       params.set_translate(settings.translate);
       params.set_no_context(!settings.context);
+      params.set_n_threads(settings.num_thread);
     }
     params
   }
@@ -200,6 +203,7 @@ impl ObjectSubclass for WhisperFilter {
         language: DEFAULT_LANGUAGE.into(),
         translate: DEFAULT_TRANSLATE,
         context: DEFAULT_CONTEXT,
+        num_thread: DEFAULT_NUM_THREAD,
       }),
       state: Mutex::new(None),
     }
@@ -245,6 +249,13 @@ impl ObjectImpl for WhisperFilter {
         .mutable_paused()
         .mutable_playing()
         .build(),
+      glib::ParamSpecInt::builder("num-thread")
+        .nick("Number of thread")
+        .blurb(&format!("Set the number of threads for inference. Defaults to {}.", DEFAULT_NUM_THREAD))
+        .mutable_ready()
+        .mutable_paused()
+        .mutable_playing()
+        .build(),
     ]
     });
     PROPERTIES.as_ref()
@@ -268,6 +279,9 @@ impl ObjectImpl for WhisperFilter {
       "context" => {
         settings.context = value.get().unwrap();
       },
+      "num-thread" => {
+        settings.num_thread = value.get().unwrap();
+      },
       other => panic!("no such property: {}", other),
     }
   }
@@ -280,6 +294,7 @@ impl ObjectImpl for WhisperFilter {
       "language" => settings.language.to_value(),
       "translate" => settings.translate.to_value(),
       "context" => settings.context.to_value(),
+      "num-thread" => settings.num_thread.to_value(),
       other => panic!("no such property: {}", other),
     }
   }
